@@ -6,7 +6,7 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Link } from "expo-router";
 import { useAuthStore } from "@/store/authStore";
 import { Feather } from "@expo/vector-icons";
 
@@ -33,16 +33,16 @@ export default function ProfileScreen() {
           <Text style={styles.authSubtext}>
             Login to access your profile and save favorites
           </Text>
-          <TouchableOpacity
-            style={styles.loginButton}
-            onPress={() => router.push("/login")}>
-            <Text style={styles.loginButtonText}>Login</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.registerButton}
-            onPress={() => router.push("/register")}>
-            <Text style={styles.registerButtonText}>Create Account</Text>
-          </TouchableOpacity>
+          <Link href="/auth/login" asChild>
+            <TouchableOpacity style={styles.loginButton}>
+              <Text style={styles.loginButtonText}>Login</Text>
+            </TouchableOpacity>
+          </Link>
+          <Link href="/auth/register" asChild>
+            <TouchableOpacity style={styles.registerButton}>
+              <Text style={styles.registerButtonText}>Create Account</Text>
+            </TouchableOpacity>
+          </Link>
         </View>
       </View>
     );

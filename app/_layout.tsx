@@ -23,6 +23,7 @@ export default function RootLayout() {
             fontWeight: "bold",
           },
         }}>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="auth/login" options={{ title: "Login" }} />
         <Stack.Screen name="auth/register" options={{ title: "Register" }} />

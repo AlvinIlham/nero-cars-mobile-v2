@@ -11,10 +11,11 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
-import { router } from "expo-router";
+import { router, Link } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Feather } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/store/authStore";
 
 interface CarFormData {
   brand: string;
@@ -41,6 +42,7 @@ interface Agreements {
 }
 
 export default function SellCarScreen() {
+  const { user } = useAuthStore();
   const [formData, setFormData] = useState<CarFormData>({
     brand: "",
     model: "",
@@ -349,6 +351,31 @@ export default function SellCarScreen() {
     { label: "Dashboard", required: true },
     { label: "Mesin", required: true },
   ];
+
+  // Show login prompt if user is not logged in
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.authPrompt}>
+          <Feather name="shopping-bag" color="#94a3b8" size={64} />
+          <Text style={styles.authTitle}>Login Required</Text>
+          <Text style={styles.authSubtext}>
+            You need to login to sell your car
+          </Text>
+          <Link href="/auth/login" asChild>
+            <TouchableOpacity style={styles.loginButton}>
+              <Text style={styles.loginButtonText}>Login</Text>
+            </TouchableOpacity>
+          </Link>
+          <Link href="/auth/register" asChild>
+            <TouchableOpacity style={styles.registerButton}>
+              <Text style={styles.registerButtonText}>Create Account</Text>
+            </TouchableOpacity>
+          </Link>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -996,5 +1023,52 @@ const styles = StyleSheet.create({
   link: {
     color: "#FF6B00",
     textDecorationLine: "underline",
+  },
+  authPrompt: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  authTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#fff",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  authSubtext: {
+    fontSize: 16,
+    color: "#94a3b8",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  loginButton: {
+    backgroundColor: "#3b82f6",
+    paddingHorizontal: 40,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    width: "80%",
+    alignItems: "center",
+  },
+  loginButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  registerButton: {
+    borderWidth: 1,
+    borderColor: "#3b82f6",
+    paddingHorizontal: 40,
+    paddingVertical: 12,
+    borderRadius: 8,
+    width: "80%",
+    alignItems: "center",
+  },
+  registerButtonText: {
+    color: "#3b82f6",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

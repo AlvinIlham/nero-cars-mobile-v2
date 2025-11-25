@@ -53,6 +53,7 @@ export const useCarStore = create<CarState>((set) => ({
         data.slice(0, 3).forEach((car, index) => {
           console.log(`Car ${index + 1}:`, {
             id: car.id,
+            user_id: car.user_id, // Added user_id logging
             brand: car.brand,
             model: car.model,
             year: car.year,

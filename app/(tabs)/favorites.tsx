@@ -10,7 +10,7 @@ import {
   StyleSheet,
   RefreshControl,
 } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect, Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../../lib/supabase";
 import { useAuthStore } from "../../store/authStore";
@@ -243,6 +243,31 @@ export default function FavoritesScreen() {
     </View>
   );
 
+  // Show login prompt if user is not logged in
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.authPrompt}>
+          <Ionicons name="heart-outline" color="#94a3b8" size={64} />
+          <Text style={styles.authTitle}>Login Required</Text>
+          <Text style={styles.authSubtext}>
+            Login to save and view your favorite cars
+          </Text>
+          <Link href="/auth/login" asChild>
+            <TouchableOpacity style={styles.loginButton}>
+              <Text style={styles.loginButtonText}>Login</Text>
+            </TouchableOpacity>
+          </Link>
+          <Link href="/auth/register" asChild>
+            <TouchableOpacity style={styles.registerButton}>
+              <Text style={styles.registerButtonText}>Create Account</Text>
+            </TouchableOpacity>
+          </Link>
+        </View>
+      </View>
+    );
+  }
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -394,5 +419,52 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
     fontSize: 16,
+  },
+  authPrompt: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  authTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#fff",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  authSubtext: {
+    fontSize: 16,
+    color: "#94a3b8",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  loginButton: {
+    backgroundColor: "#3b82f6",
+    paddingHorizontal: 40,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    width: "80%",
+    alignItems: "center",
+  },
+  loginButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  registerButton: {
+    borderWidth: 1,
+    borderColor: "#3b82f6",
+    paddingHorizontal: 40,
+    paddingVertical: 12,
+    borderRadius: 8,
+    width: "80%",
+    alignItems: "center",
+  },
+  registerButtonText: {
+    color: "#3b82f6",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

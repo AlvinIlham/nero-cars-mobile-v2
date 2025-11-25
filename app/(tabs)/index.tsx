@@ -101,7 +101,11 @@ export default function HomeScreen() {
   };
 
   const toggleFavorite = async (carId: string) => {
+    console.log("❤️ toggleFavorite called with carId:", carId);
+    console.log("👤 Current user:", user ? user.email : "Not logged in");
+
     if (!user) {
+      console.log("⚠️ User not logged in, showing alert");
       Alert.alert("Login Required", "Please login to save favorites", [
         { text: "Cancel", style: "cancel" },
         { text: "Login", onPress: () => router.push("/login") },
@@ -111,8 +115,10 @@ export default function HomeScreen() {
 
     try {
       const isFavorited = favorites.has(carId);
+      console.log("💝 Is currently favorited:", isFavorited);
 
       if (isFavorited) {
+        console.log("🗑️ Removing from favorites...");
         // Remove from favorites
         const { error } = await supabase
           .from("favorites")
@@ -127,7 +133,9 @@ export default function HomeScreen() {
           newSet.delete(carId);
           return newSet;
         });
+        console.log("✅ Successfully removed from favorites");
       } else {
+        console.log("➕ Adding to favorites...");
         // Add to favorites
         const { error: favoriteError } = await supabase
           .from("favorites")
@@ -141,9 +149,16 @@ export default function HomeScreen() {
         // Get car details to send notification
         const car = cars.find((c) => c.id === carId);
 
-        if (car && car.user_id !== user.id) {
+        console.log("🚗 Car found:", car ? "Yes" : "No");
+        console.log("🚗 Car user_id:", car?.user_id);
+        console.log("👤 Current user id:", user.id);
+        console.log("🎯 Same user?", car?.user_id === user.id);
+
+        if (car && car.user_id && car.user_id !== user.id) {
+          console.log("📤 Attempting to create notification for car owner...");
+
           // Send notification to car owner
-          const { error: notifError } = await supabase
+          const { data: notifData, error: notifError } = await supabase
             .from("notifications")
             .insert({
               user_id: car.user_id,
@@ -154,16 +169,30 @@ export default function HomeScreen() {
               } menyukai ${car.brand} ${car.model} Anda`,
               link: `/cars/${carId}`,
               is_read: false,
-            });
+            })
+            .select();
 
           if (notifError) {
-            console.error("Error creating favorite notification:", notifError);
-          } else {
-            console.log(
-              "✅ Favorite notification created for car owner:",
-              car.user_id
+            console.error(
+              "❌ Error creating favorite notification:",
+              notifError
             );
+            console.error(
+              "❌ Error details:",
+              JSON.stringify(notifError, null, 2)
+            );
+          } else {
+            console.log("✅ Notification created successfully!");
+            console.log("✅ Notification data:", notifData);
           }
+        } else if (!car) {
+          console.log("⚠️ Car not found in cars array");
+        } else if (!car.user_id) {
+          console.log("⚠️ Car has no user_id");
+        } else if (car.user_id === user.id) {
+          console.log(
+            "ℹ️ Skipping notification - user favorited their own car"
+          );
         }
 
         setFavorites((prev) => new Set([...prev, carId]));
