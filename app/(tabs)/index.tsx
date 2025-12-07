@@ -18,6 +18,7 @@ import { useCarStore } from "@/store/carStore";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import type { Car } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { getOrCreateConversation } from "@/lib/chatService";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width - 40;
@@ -56,11 +57,18 @@ export default function HomeScreen() {
     maxYear: 0,
   });
   const [activeFilterCount, setActiveFilterCount] = useState(0);
-  const [newsletterEmail, setNewsletterEmail] = useState("");
-  const [isSubscribing, setIsSubscribing] = useState(false);
+
+  // State untuk filter options dari database
+  const [availableBrands, setAvailableBrands] = useState<string[]>([]);
+  const [availableLocations, setAvailableLocations] = useState<string[]>([]);
+  const [availableTransmissions, setAvailableTransmissions] = useState<
+    string[]
+  >([]);
+  const [availableFuelTypes, setAvailableFuelTypes] = useState<string[]>([]);
 
   useEffect(() => {
     fetchCars();
+    fetchFilterOptions();
     if (user?.id) {
       fetchFavorites();
     }
@@ -97,6 +105,151 @@ export default function HomeScreen() {
       setFavorites(favSet);
     } catch (error) {
       console.log("Error in fetchFavorites:", error);
+    }
+  };
+
+  const fetchFilterOptions = async () => {
+    try {
+      const defaultBrands = [
+        "Toyota",
+        "Honda",
+        "Daihatsu",
+        "Suzuki",
+        "Mitsubishi",
+        "Nissan",
+        "Mazda",
+        "BMW",
+        "Mercedes-Benz",
+        "Audi",
+        "Volkswagen",
+        "Hyundai",
+        "KIA",
+        "Ford",
+        "Chevrolet",
+        "Wuling",
+        "DFSK",
+        "MG",
+        "Lexus",
+        "Isuzu",
+        "Subaru",
+        "Peugeot",
+        "Renault",
+        "Porsche",
+        "Tesla",
+      ].sort();
+
+      const defaultLocations = [
+        "Jakarta",
+        "Surabaya",
+        "Bandung",
+        "Medan",
+        "Semarang",
+        "Makassar",
+        "Palembang",
+        "Tangerang",
+        "Depok",
+        "Bekasi",
+        "Bogor",
+        "Batam",
+        "Pekanbaru",
+        "Bandar Lampung",
+        "Padang",
+        "Malang",
+        "Denpasar",
+        "Samarinda",
+        "Balikpapan",
+        "Pontianak",
+        "Manado",
+        "Yogyakarta",
+        "Solo",
+        "Cirebon",
+        "Serang",
+      ].sort();
+
+      const defaultTransmissions = [
+        "Manual",
+        "Automatic",
+        "CVT",
+        "DCT",
+        "Semi-Automatic",
+        "AMT",
+        "Dual Clutch",
+        "Tiptronic",
+      ];
+
+      const defaultFuelTypes = [
+        "Bensin",
+        "Diesel",
+        "Electric",
+        "Hybrid",
+        "Plug-in Hybrid",
+        "CNG",
+        "LPG",
+        "Flex Fuel",
+        "Hydrogen",
+        "Biodiesel",
+      ];
+
+      const { data: brandsData } = await supabase
+        .from("brands")
+        .select("name")
+        .order("name");
+
+      const { data: locationsData } = await supabase
+        .from("locations")
+        .select("city")
+        .order("city");
+
+      const { data: carsData } = await supabase
+        .from("cars")
+        .select("brand, location, transmission, fuel_type");
+
+      if (brandsData && brandsData.length > 0) {
+        setAvailableBrands(brandsData.map((b) => b.name).sort());
+      } else if (carsData && carsData.length > 0) {
+        const carBrands = [
+          ...new Set(carsData.map((car) => car.brand).filter(Boolean)),
+        ];
+        setAvailableBrands(
+          [...new Set([...carBrands, ...defaultBrands])].sort()
+        );
+      } else {
+        setAvailableBrands(defaultBrands);
+      }
+
+      if (locationsData && locationsData.length > 0) {
+        setAvailableLocations(locationsData.map((l) => l.city).sort());
+      } else if (carsData && carsData.length > 0) {
+        const carLocations = [
+          ...new Set(carsData.map((car) => car.location).filter(Boolean)),
+        ];
+        setAvailableLocations(
+          [...new Set([...carLocations, ...defaultLocations])].sort()
+        );
+      } else {
+        setAvailableLocations(defaultLocations);
+      }
+
+      if (carsData && carsData.length > 0) {
+        const carTransmissions = [
+          ...new Set(carsData.map((car) => car.transmission).filter(Boolean)),
+        ];
+        setAvailableTransmissions(
+          [...new Set([...carTransmissions, ...defaultTransmissions])].sort()
+        );
+
+        const carFuelTypes = [
+          ...new Set(carsData.map((car) => car.fuel_type).filter(Boolean)),
+        ];
+        setAvailableFuelTypes(
+          [...new Set([...carFuelTypes, ...defaultFuelTypes])].sort()
+        );
+      } else {
+        setAvailableTransmissions(defaultTransmissions.sort());
+        setAvailableFuelTypes(defaultFuelTypes.sort());
+      }
+    } catch (error) {
+      console.error("Error fetching filter options:", error);
     }
   };
 
@@ -223,99 +376,100 @@ export default function HomeScreen() {
     setImageIndexes((prev) => ({ ...prev, [carId]: newIndex }));
   };
 
-  const handleContactSeller = (car: Car) => {
+  const handleContactSeller = async (car: Car) => {
+    console.log("=== HUBUNGI PENJUAL CLICKED (HOME) ===");
+    console.log("User:", user);
+    console.log("Car:", car);
+
     if (!user) {
+      console.log("ERROR: User not logged in");
       Alert.alert("Login Required", "Please login to contact the seller", [
         { text: "Cancel", style: "cancel" },
-        { text: "Login", onPress: () => router.push("/login") },
+        { text: "Login", onPress: () => router.push("/auth/login") },
       ]);
       return;
     }
 
     if (!car?.user_id) {
+      console.log("ERROR: Car user_id not available");
       Alert.alert("Error", "Seller information not available");
       return;
     }
 
     if (car.user_id === user.id) {
+      console.log("ERROR: User trying to contact themselves");
       Alert.alert("Info", "This is your own car listing");
       return;
     }
 
-    router.push({
-      pathname: "/chat/[userId]",
-      params: {
-        userId: car.user_id,
-        userName: `Seller of ${car.brand} ${car.model}`,
+    try {
+      console.log("STEP 1: Creating conversation...");
+      console.log("Params:", {
         carId: car.id,
-      },
-    });
+        buyerId: user.id,
+        sellerId: car.user_id,
+      });
+
+      const { data: conversation, error: convError } =
+        await getOrCreateConversation(car.id, user.id, car.user_id);
+
+      console.log("STEP 2: Conversation result:", {
+        conversation,
+        error: convError,
+      });
+
+      if (convError || !conversation) {
+        console.error("ERROR: Failed to create conversation:", convError);
+        Alert.alert(
+          "Error",
+          "Failed to create conversation. Please try again."
+        );
+        return;
+      }
+
+      console.log("SUCCESS: Conversation ID:", conversation.id);
+
+      console.log("STEP 3: Getting seller profile...");
+      const { data: sellerProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", car.user_id)
+        .single();
+
+      console.log("Seller profile result:", {
+        sellerProfile,
+        error: profileError,
+      });
+
+      const chatParams = {
+        id: conversation.id,
+        otherPersonName: sellerProfile?.full_name || "Seller",
+        carInfo: `${car.brand} ${car.model} ${car.year}`,
+      };
+
+      console.log("STEP 4: Navigation params:", chatParams);
+      console.log("STEP 5: Attempting navigation to /messages/[id]");
+
+      // Navigate to chat room
+      router.push({
+        pathname: "/messages/[id]" as any,
+        params: chatParams,
+      } as any);
+
+      console.log("STEP 6: Navigation called successfully");
+    } catch (error) {
+      console.error("ERROR: Exception caught:", error);
+      console.error("Error details:", JSON.stringify(error, null, 2));
+      Alert.alert("Error", "Failed to open chat. Please try again.");
+    }
   };
 
   const getBrands = () => {
-    const brands = [...new Set(cars.map((car) => car.brand))];
-    console.log("Available brands in database:", brands);
-    return brands.sort();
-  };
-
-  const handleNewsletterSubscribe = async () => {
-    // Validate email
-    if (!newsletterEmail.trim()) {
-      Alert.alert("Error", "Mohon masukkan alamat email");
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newsletterEmail)) {
-      Alert.alert("Error", "Format email tidak valid");
-      return;
-    }
-
-    setIsSubscribing(true);
-
-    // Temporary: Newsletter feature will be available soon
-    setTimeout(() => {
-      Alert.alert(
-        "Terima Kasih!",
-        `Email ${newsletterEmail} telah dicatat. Fitur newsletter akan segera aktif!`
-      );
-      setNewsletterEmail("");
-      setIsSubscribing(false);
-    }, 1000);
-
-    // TODO: Uncomment when newsletter table is created in database
-    /*
-    try {
-      const { error } = await supabase.from("newsletters").insert({
-        email: newsletterEmail.toLowerCase(),
-      });
-
-      if (error) {
-        console.error("Newsletter subscription error:", error);
-        if (error.code === "23505") {
-          Alert.alert("Info", "Email sudah terdaftar di newsletter kami");
-        } else {
-          throw error;
-        }
-      } else {
-        Alert.alert(
-          "Berhasil!",
-          "Terima kasih telah berlangganan newsletter NeroCars!"
-        );
-        setNewsletterEmail("");
-      }
-    } catch (error: any) {
-      console.error("Error subscribing to newsletter:", error);
-      Alert.alert("Error", "Gagal berlangganan. Silakan coba lagi.");
-    } finally {
-      setIsSubscribing(false);
-    }
-    */
+    return availableBrands;
   };
 
   const getLocations = () => {
-    const locations = [...new Set(cars.map((car) => car.location))];
-    return locations.sort();
+    return availableLocations;
   };
 
   // Helper function to parse images - handle string, JSON string, or array
@@ -538,7 +692,7 @@ export default function HomeScreen() {
           </View>
 
           <Text style={styles.featuredPrice}>
-            Rp {(item.price / 1000000).toFixed(0)} Jt
+            Rp {item.price.toLocaleString("id-ID")}
           </Text>
 
           <View style={styles.cardActions}>
@@ -662,7 +816,7 @@ export default function HomeScreen() {
           </View>
 
           <Text style={styles.brandCarPrice}>
-            Rp {(item.price / 1000000).toFixed(0)} Jt
+            Rp {item.price.toLocaleString("id-ID")}
           </Text>
         </View>
       </TouchableOpacity>
@@ -720,271 +874,24 @@ export default function HomeScreen() {
             placeholderTextColor="#64748b"
             value={searchQuery}
             onChangeText={setSearchQuery}
+            returnKeyType="search"
             onSubmitEditing={() => {
               if (searchQuery.trim()) {
-                router.push(`/cars?search=${searchQuery}`);
+                router.push(
+                  `/(tabs)/cars?search=${encodeURIComponent(
+                    searchQuery.trim()
+                  )}`
+                );
               }
             }}
           />
-          {searchQuery.length > 0 ? (
+          {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery("")}>
               <Feather name="x" color="#94a3b8" size={20} />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={() => setShowFilterModal(true)}>
-              <Feather name="sliders" color="#f59e0b" size={20} />
             </TouchableOpacity>
           )}
         </View>
       </View>
-
-      {/* Filter Modal */}
-      <Modal
-        visible={showFilterModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowFilterModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filter Cars</Text>
-              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
-                <Feather name="x" color="#fff" size={24} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.filterScroll}>
-              {/* Brand Filter */}
-              <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Brand</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <TouchableOpacity
-                    style={[
-                      styles.filterChip,
-                      !filters.brand && styles.filterChipActive,
-                    ]}
-                    onPress={() => setFilters({ ...filters, brand: "" })}>
-                    <Text
-                      style={[
-                        styles.filterChipText,
-                        !filters.brand && styles.filterChipTextActive,
-                      ]}>
-                      All
-                    </Text>
-                  </TouchableOpacity>
-                  {getBrands().map((brand) => (
-                    <TouchableOpacity
-                      key={brand}
-                      style={[
-                        styles.filterChip,
-                        filters.brand === brand && styles.filterChipActive,
-                      ]}
-                      onPress={() => setFilters({ ...filters, brand })}>
-                      <Text
-                        style={[
-                          styles.filterChipText,
-                          filters.brand === brand &&
-                            styles.filterChipTextActive,
-                        ]}>
-                        {brand}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              {/* Transmission Filter */}
-              <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Transmission</Text>
-                <View style={styles.filterRow}>
-                  {["Manual", "Automatic", "CVT", "DCT"].map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.filterChip,
-                        filters.transmission === type &&
-                          styles.filterChipActive,
-                      ]}
-                      onPress={() =>
-                        setFilters({
-                          ...filters,
-                          transmission:
-                            filters.transmission === type ? "" : type,
-                        })
-                      }>
-                      <Text
-                        style={[
-                          styles.filterChipText,
-                          filters.transmission === type &&
-                            styles.filterChipTextActive,
-                        ]}>
-                        {type}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Fuel Type Filter */}
-              <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Fuel Type</Text>
-                <View style={styles.filterRow}>
-                  {["Petrol", "Diesel", "Electric", "Hybrid"].map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.filterChip,
-                        filters.fuelType === type && styles.filterChipActive,
-                      ]}
-                      onPress={() =>
-                        setFilters({
-                          ...filters,
-                          fuelType: filters.fuelType === type ? "" : type,
-                        })
-                      }>
-                      <Text
-                        style={[
-                          styles.filterChipText,
-                          filters.fuelType === type &&
-                            styles.filterChipTextActive,
-                        ]}>
-                        {type}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Location Filter */}
-              <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Location</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <TouchableOpacity
-                    style={[
-                      styles.filterChip,
-                      !filters.location && styles.filterChipActive,
-                    ]}
-                    onPress={() => setFilters({ ...filters, location: "" })}>
-                    <Text
-                      style={[
-                        styles.filterChipText,
-                        !filters.location && styles.filterChipTextActive,
-                      ]}>
-                      All Cities
-                    </Text>
-                  </TouchableOpacity>
-                  {getLocations().map((location) => (
-                    <TouchableOpacity
-                      key={location}
-                      style={[
-                        styles.filterChip,
-                        filters.location === location &&
-                          styles.filterChipActive,
-                      ]}
-                      onPress={() => setFilters({ ...filters, location })}>
-                      <Text
-                        style={[
-                          styles.filterChipText,
-                          filters.location === location &&
-                            styles.filterChipTextActive,
-                        ]}>
-                        {location}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              {/* Price Range */}
-              <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Price Range (Million Rp)</Text>
-                <View style={styles.rangeInputs}>
-                  <TextInput
-                    style={styles.rangeInput}
-                    placeholder="Min"
-                    placeholderTextColor="#64748b"
-                    keyboardType="numeric"
-                    value={
-                      filters.minPrice > 0
-                        ? (filters.minPrice / 1000000).toString()
-                        : ""
-                    }
-                    onChangeText={(text) =>
-                      setFilters({
-                        ...filters,
-                        minPrice: parseInt(text || "0") * 1000000,
-                      })
-                    }
-                  />
-                  <Text style={styles.rangeSeparator}>-</Text>
-                  <TextInput
-                    style={styles.rangeInput}
-                    placeholder="Max"
-                    placeholderTextColor="#64748b"
-                    keyboardType="numeric"
-                    value={
-                      filters.maxPrice > 0
-                        ? (filters.maxPrice / 1000000).toString()
-                        : ""
-                    }
-                    onChangeText={(text) =>
-                      setFilters({
-                        ...filters,
-                        maxPrice: parseInt(text || "0") * 1000000,
-                      })
-                    }
-                  />
-                </View>
-              </View>
-
-              {/* Year Range */}
-              <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Year Range</Text>
-                <View style={styles.rangeInputs}>
-                  <TextInput
-                    style={styles.rangeInput}
-                    placeholder="Min Year"
-                    placeholderTextColor="#64748b"
-                    keyboardType="numeric"
-                    value={
-                      filters.minYear > 0 ? filters.minYear.toString() : ""
-                    }
-                    onChangeText={(text) =>
-                      setFilters({ ...filters, minYear: parseInt(text || "0") })
-                    }
-                  />
-                  <Text style={styles.rangeSeparator}>-</Text>
-                  <TextInput
-                    style={styles.rangeInput}
-                    placeholder="Max Year"
-                    placeholderTextColor="#64748b"
-                    keyboardType="numeric"
-                    value={
-                      filters.maxYear > 0 ? filters.maxYear.toString() : ""
-                    }
-                    onChangeText={(text) =>
-                      setFilters({ ...filters, maxYear: parseInt(text || "0") })
-                    }
-                  />
-                </View>
-              </View>
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.resetButton}
-                onPress={resetFilters}>
-                <Text style={styles.resetButtonText}>Reset All</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.applyButton}
-                onPress={() => setShowFilterModal(false)}>
-                <Text style={styles.applyButtonText}>Apply Filters</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Featured Cars */}
       <View style={styles.section}>
@@ -1188,42 +1095,6 @@ export default function HomeScreen() {
           </View>
           <Feather name="chevron-right" size={24} color="#94a3b8" />
         </TouchableOpacity>
-      </View>
-
-      {/* Newsletter Section */}
-      <View style={styles.section}>
-        <View style={styles.newsletterContainer}>
-          <Text style={styles.newsletterTitle}>
-            Berlangganan Newsletter Kami
-          </Text>
-          <Text style={styles.newsletterSubtitle}>
-            Dapatkan update terbaru, promosi & keuntungan eksklusif yang
-            dikirimkan langsung ke email Anda.
-          </Text>
-          <View style={styles.newsletterInputContainer}>
-            <TextInput
-              style={styles.newsletterInput}
-              placeholder="Alamat email"
-              placeholderTextColor="#64748b"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={newsletterEmail}
-              onChangeText={setNewsletterEmail}
-              editable={!isSubscribing}
-            />
-            <TouchableOpacity
-              style={[
-                styles.newsletterButton,
-                isSubscribing && styles.newsletterButtonDisabled,
-              ]}
-              onPress={handleNewsletterSubscribe}
-              disabled={isSubscribing}>
-              <Text style={styles.newsletterButtonText}>
-                {isSubscribing ? "..." : "Kirim"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </View>
     </ScrollView>
   );
@@ -1642,56 +1513,6 @@ const styles = StyleSheet.create({
   feedbackSubtitle: {
     fontSize: 13,
     color: "#94a3b8",
-  },
-  newsletterContainer: {
-    backgroundColor: "#1e293b",
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#334155",
-  },
-  newsletterTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 8,
-  },
-  newsletterSubtitle: {
-    fontSize: 13,
-    color: "#94a3b8",
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  newsletterInputContainer: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  newsletterInput: {
-    flex: 1,
-    backgroundColor: "#0f172a",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: "#fff",
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: "#334155",
-  },
-  newsletterButton: {
-    backgroundColor: "#10b981",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: "center",
-  },
-  newsletterButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  newsletterButtonDisabled: {
-    backgroundColor: "#64748b",
-    opacity: 0.6,
   },
   loadingContainer: {
     padding: 40,

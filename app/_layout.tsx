@@ -28,6 +28,7 @@ export default function RootLayout() {
         <Stack.Screen name="auth/login" options={{ title: "Login" }} />
         <Stack.Screen name="auth/register" options={{ title: "Register" }} />
         <Stack.Screen name="cars/[id]" options={{ title: "Car Detail" }} />
+        <Stack.Screen name="messages" options={{ headerShown: false }} />
       </Stack>
     </>
   );

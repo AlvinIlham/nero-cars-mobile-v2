@@ -15,6 +15,8 @@ import { useCarStore } from "@/store/carStore";
 import { useAuthStore } from "@/store/authStore";
 import { Feather, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import type { Car } from "@/types";
+import { getOrCreateConversation } from "@/lib/chatService";
+import { supabase } from "@/lib/supabase";
 
 const { width } = Dimensions.get("window");
 
@@ -62,34 +64,96 @@ export default function CarDetailScreen() {
     return images.length > 0 ? images : ["https://via.placeholder.com/400"];
   };
 
-  const handleContactSeller = () => {
+  const handleContactSeller = async () => {
+    console.log("=== HUBUNGI PENJUAL CLICKED ===");
+    console.log("User:", user);
+    console.log("Car:", car);
+
     if (!user) {
+      console.log("ERROR: User not logged in");
       Alert.alert("Login Required", "Please login to contact the seller", [
         { text: "Cancel", style: "cancel" },
-        { text: "Login", onPress: () => router.push("/login") },
+        { text: "Login", onPress: () => router.push("/auth/login") },
       ]);
       return;
     }
 
     if (!car?.user_id) {
+      console.log("ERROR: Car user_id not available");
       Alert.alert("Error", "Seller information not available");
       return;
     }
 
     if (car.user_id === user.id) {
+      console.log("ERROR: User trying to contact themselves");
       Alert.alert("Info", "This is your own car listing");
       return;
     }
 
-    // Navigate to chat with seller
-    router.push({
-      pathname: "/chat/[userId]",
-      params: {
-        userId: car.user_id,
-        userName: `Seller of ${car.brand} ${car.model}`,
+    try {
+      console.log("STEP 1: Creating conversation...");
+      console.log("Params:", {
         carId: car.id,
-      },
-    });
+        buyerId: user.id,
+        sellerId: car.user_id,
+      });
+
+      const { data: conversation, error: convError } =
+        await getOrCreateConversation(car.id, user.id, car.user_id);
+
+      console.log("STEP 2: Conversation result:", {
+        conversation,
+        error: convError,
+      });
+
+      if (convError || !conversation) {
+        console.error("ERROR: Failed to create conversation:", convError);
+        Alert.alert(
+          "Error",
+          "Failed to create conversation. Please try again."
+        );
+        return;
+      }
+
+      console.log("SUCCESS: Conversation ID:", conversation.id);
+
+      console.log("STEP 3: Getting seller profile...");
+      const { data: sellerProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", car.user_id)
+        .single();
+
+      console.log("Seller profile result:", {
+        sellerProfile,
+        error: profileError,
+      });
+
+      const chatParams = {
+        id: conversation.id,
+        otherPersonName: sellerProfile?.full_name || "Seller",
+        carInfo: `${car.brand} ${car.model} ${car.year}`,
+      };
+
+      console.log("STEP 4: Navigation params:", chatParams);
+      console.log("STEP 5: Attempting navigation to /messages/[id]");
+
+      // Try different navigation approaches
+      const navigationPath = "/messages/" + conversation.id;
+      console.log("Navigation path:", navigationPath);
+
+      // Navigate to chat room
+      router.push({
+        pathname: "/messages/[id]" as any,
+        params: chatParams,
+      } as any);
+
+      console.log("STEP 6: Navigation called successfully");
+    } catch (error) {
+      console.error("ERROR: Exception caught:", error);
+      console.error("Error details:", JSON.stringify(error, null, 2));
+      Alert.alert("Error", "Failed to open chat. Please try again.");
+    }
   };
 
   const formatPrice = (price: number) => {

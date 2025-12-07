@@ -59,6 +59,7 @@ export interface Car {
   transmission: "Manual" | "Automatic" | "CVT" | "DCT";
   engine_capacity?: string;
   fuel_type: "Petrol" | "Diesel" | "Electric" | "Hybrid";
+  body_type?: string;
   condition?: "Excellent" | "Good" | "Fair" | "Poor";
   color: string;
   description?: string;

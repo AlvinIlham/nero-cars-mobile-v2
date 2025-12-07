@@ -8,9 +8,11 @@ import {
   Alert,
   ActivityIndicator,
   StyleSheet,
+  Image,
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { supabase } from "../../lib/supabase";
 import { useAuthStore } from "../../store/authStore";
 
@@ -24,6 +26,7 @@ interface FormData {
   address: string;
   city: string;
   province: string;
+  avatar_url: string;
 }
 
 export default function EditProfilePage() {
@@ -31,6 +34,7 @@ export default function EditProfilePage() {
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({
     firstName: "",
     lastName: "",
@@ -41,6 +45,7 @@ export default function EditProfilePage() {
     address: "",
     city: "",
     province: "",
+    avatar_url: "",
   });
 
   useEffect(() => {
@@ -79,7 +84,12 @@ export default function EditProfilePage() {
           address: profile.address || "",
           city: profile.city || "",
           province: profile.province || "",
+          avatar_url: profile.avatar_url || "",
         });
+
+        if (profile.avatar_url) {
+          setAvatarUri(profile.avatar_url);
+        }
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -89,9 +99,42 @@ export default function EditProfilePage() {
     }
   };
 
+  const pickImage = async () => {
+    try {
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (permissionResult.granted === false) {
+        Alert.alert(
+          "Permission Required",
+          "Permission to access camera roll is required!"
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setAvatarUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "Gagal memilih gambar");
+    }
+  };
+
+  const removeAvatar = () => {
+    setAvatarUri(null);
+  };
+
   const handleSubmit = async () => {
-    if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      Alert.alert("Validasi", "Nama depan dan belakang harus diisi");
+    if (!formData.firstName.trim()) {
+      Alert.alert("Validasi", "Nama depan harus diisi");
       return;
     }
 
@@ -104,6 +147,43 @@ export default function EditProfilePage() {
 
     try {
       const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`;
+      let avatarUrl = formData.avatar_url;
+
+      // Upload avatar if new image selected
+      if (avatarUri && !avatarUri.startsWith("http")) {
+        try {
+          const fileExt = avatarUri.split(".").pop()?.toLowerCase() || "jpg";
+          const fileName = `${user?.id}/avatar_${Date.now()}.${fileExt}`;
+
+          const response = await fetch(avatarUri);
+          const arrayBuffer = await response.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+
+          const { data: uploadData, error: uploadError } =
+            await supabase.storage
+              .from("car-image")
+              .upload(fileName, uint8Array, {
+                contentType: `image/${fileExt}`,
+                upsert: true,
+              });
+
+          if (uploadError) throw uploadError;
+
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from("car-image").getPublicUrl(fileName);
+
+          avatarUrl = publicUrl;
+        } catch (uploadError) {
+          console.error("Error uploading avatar:", uploadError);
+          Alert.alert(
+            "Warning",
+            "Gagal upload foto profil, data lain akan tetap disimpan"
+          );
+        }
+      } else if (!avatarUri) {
+        avatarUrl = "";
+      }
 
       const { error } = await supabase
         .from("profiles")
@@ -115,6 +195,7 @@ export default function EditProfilePage() {
           address: formData.address,
           city: formData.city,
           province: formData.province,
+          avatar_url: avatarUrl,
           updated_at: new Date().toISOString(),
         })
         .eq("id", user?.id);
@@ -171,6 +252,36 @@ export default function EditProfilePage() {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}>
         <View style={styles.formContainer}>
+          {/* Avatar Section */}
+          <View style={styles.avatarSection}>
+            <View style={styles.avatarContainer}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={styles.avatarText}>
+                    {formData.firstName.charAt(0).toUpperCase() || "U"}
+                  </Text>
+                </View>
+              )}
+              <TouchableOpacity style={styles.cameraButton} onPress={pickImage}>
+                <Ionicons name="camera" size={20} color="#fff" />
+              </TouchableOpacity>
+              {avatarUri && (
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={removeAvatar}>
+                  <Ionicons name="close" size={16} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </View>
+            <Text style={styles.avatarHint}>
+              {avatarUri
+                ? "Foto dipilih"
+                : "Klik ikon kamera untuk upload foto"}
+            </Text>
+          </View>
+
           {/* Nama Depan */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Nama Depan *</Text>
@@ -187,7 +298,7 @@ export default function EditProfilePage() {
 
           {/* Nama Belakang */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Nama Belakang *</Text>
+            <Text style={styles.label}>Nama Belakang (Opsional)</Text>
             <TextInput
               style={styles.input}
               value={formData.lastName}
@@ -454,5 +565,67 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  avatarSection: {
+    alignItems: "center",
+    marginBottom: 24,
+    paddingVertical: 20,
+  },
+  avatarContainer: {
+    position: "relative",
+    marginBottom: 12,
+  },
+  avatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 3,
+    borderColor: "#f59e0b",
+  },
+  avatarPlaceholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#334155",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: "#f59e0b",
+  },
+  avatarText: {
+    fontSize: 48,
+    fontWeight: "bold",
+    color: "#f59e0b",
+  },
+  cameraButton: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#f59e0b",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#0f172a",
+  },
+  removeButton: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#ef4444",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#0f172a",
+  },
+  avatarHint: {
+    color: "#94a3b8",
+    fontSize: 12,
+    textAlign: "center",
   },
 });

@@ -2,10 +2,18 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "skipLibCheck": true,
     "paths": {
       "@/*": ["./*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"]
+  "include": [
+    "app/**/*",
+    "lib/**/*",
+    "store/**/*",
+    "types/**/*",
+    "*.ts",
+    "*.tsx"
+  ],
+  "exclude": ["node_modules", "**/node_modules/**"]
 }

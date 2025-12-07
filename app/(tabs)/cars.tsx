@@ -11,16 +11,18 @@ import {
   Modal,
   ScrollView,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useCarStore } from "@/store/carStore";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import type { Car } from "@/types";
+import { supabase } from "@/lib/supabase";
 
 type FilterState = {
   brand: string;
   transmission: string;
   fuelType: string;
   location: string;
+  bodyType: string;
   minPrice: number;
   maxPrice: number;
   minYear: number;
@@ -29,6 +31,7 @@ type FilterState = {
 
 export default function CarsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const { cars, loading, fetchCars } = useCarStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredCars, setFilteredCars] = useState<Car[]>([]);
@@ -38,6 +41,7 @@ export default function CarsScreen() {
     transmission: "",
     fuelType: "",
     location: "",
+    bodyType: "",
     minPrice: 0,
     maxPrice: 0,
     minYear: 0,
@@ -45,9 +49,59 @@ export default function CarsScreen() {
   });
   const [activeFilterCount, setActiveFilterCount] = useState(0);
 
+  // State untuk filter options dari database
+  const [availableBrands, setAvailableBrands] = useState<string[]>([]);
+  const [availableLocations, setAvailableLocations] = useState<string[]>([]);
+  const [availableBodyTypes, setAvailableBodyTypes] = useState<string[]>([]);
+  const [availableTransmissions, setAvailableTransmissions] = useState<
+    string[]
+  >([]);
+  const [availableFuelTypes, setAvailableFuelTypes] = useState<string[]>([]);
+
   useEffect(() => {
+    console.log("🚗 Cars screen mounted - fetching data...");
     fetchCars();
+    fetchFilterOptions();
   }, []);
+
+  // Load search query and filters from URL params
+  useEffect(() => {
+    if (params.search && typeof params.search === "string") {
+      setSearchQuery(params.search);
+    }
+
+    // Load filter params from URL
+    const urlFilters: FilterState = {
+      brand: typeof params.brand === "string" ? params.brand : "",
+      transmission:
+        typeof params.transmission === "string" ? params.transmission : "",
+      fuelType: typeof params.fuelType === "string" ? params.fuelType : "",
+      location: typeof params.location === "string" ? params.location : "",
+      bodyType: typeof params.bodyType === "string" ? params.bodyType : "",
+      minPrice:
+        typeof params.minPrice === "string" ? parseInt(params.minPrice) : 0,
+      maxPrice:
+        typeof params.maxPrice === "string" ? parseInt(params.maxPrice) : 0,
+      minYear:
+        typeof params.minYear === "string" ? parseInt(params.minYear) : 0,
+      maxYear:
+        typeof params.maxYear === "string" ? parseInt(params.maxYear) : 0,
+    };
+
+    // Only update if there are filter params
+    if (
+      params.brand ||
+      params.transmission ||
+      params.fuelType ||
+      params.location ||
+      params.minPrice ||
+      params.maxPrice ||
+      params.minYear ||
+      params.maxYear
+    ) {
+      setFilters(urlFilters);
+    }
+  }, [params]);
 
   // Helper function to parse images - handle string, JSON string, or array
   const parseImages = (images: any): string[] => {
@@ -111,6 +165,9 @@ export default function CarsScreen() {
     if (filters.location) {
       result = result.filter((car) => car.location === filters.location);
     }
+    if (filters.bodyType) {
+      result = result.filter((car) => car.body_type === filters.bodyType);
+    }
     if (filters.minPrice > 0) {
       result = result.filter((car) => car.price >= filters.minPrice);
     }
@@ -132,6 +189,7 @@ export default function CarsScreen() {
     if (filters.transmission) count++;
     if (filters.fuelType) count++;
     if (filters.location) count++;
+    if (filters.bodyType) count++;
     if (filters.minPrice > 0 || filters.maxPrice > 0) count++;
     if (filters.minYear > 0 || filters.maxYear > 0) count++;
     setActiveFilterCount(count);
@@ -143,6 +201,7 @@ export default function CarsScreen() {
       transmission: "",
       fuelType: "",
       location: "",
+      bodyType: "",
       minPrice: 0,
       maxPrice: 0,
       minYear: 0,
@@ -150,18 +209,338 @@ export default function CarsScreen() {
     });
   };
 
+  // Fetch filter options dari database
+  const fetchFilterOptions = async () => {
+    console.log("🔍 Fetching filter options...");
+    try {
+      // Hardcoded fallback data (same as website)
+      const defaultBrands = [
+        "Toyota",
+        "Honda",
+        "Daihatsu",
+        "Suzuki",
+        "Mitsubishi",
+        "Nissan",
+        "Mazda",
+        "BMW",
+        "Mercedes-Benz",
+        "Audi",
+        "Volkswagen",
+        "Hyundai",
+        "KIA",
+        "Ford",
+        "Chevrolet",
+        "Wuling",
+        "DFSK",
+        "MG",
+        "Lexus",
+        "Isuzu",
+        "Subaru",
+        "Peugeot",
+        "Renault",
+        "Porsche",
+        "Tesla",
+      ].sort();
+
+      const defaultLocations = [
+        "Jakarta",
+        "Surabaya",
+        "Bandung",
+        "Medan",
+        "Semarang",
+        "Makassar",
+        "Palembang",
+        "Tangerang",
+        "Depok",
+        "Bekasi",
+        "Bogor",
+        "Batam",
+        "Pekanbaru",
+        "Bandar Lampung",
+        "Padang",
+        "Malang",
+        "Denpasar",
+        "Samarinda",
+        "Balikpapan",
+        "Pontianak",
+        "Manado",
+        "Yogyakarta",
+        "Solo",
+        "Cirebon",
+        "Serang",
+      ].sort();
+
+      // Try to fetch from brands table first
+      const { data: brandsData, error: brandsError } = await supabase
+        .from("brands")
+        .select("name")
+        .order("name");
+
+      console.log("📦 Brands data:", brandsData?.length, "brands");
+      if (brandsError) console.log("❌ Brands error:", brandsError);
+
+      // Try to fetch from locations table
+      const { data: locationsData, error: locationsError } = await supabase
+        .from("locations")
+        .select("city")
+        .order("city");
+
+      console.log("📍 Locations data:", locationsData?.length, "locations");
+      if (locationsError) console.log("❌ Locations error:", locationsError);
+
+      // Fetch from cars table for other filters
+      const { data: carsData } = await supabase
+        .from("cars")
+        .select("brand, location, body_type, transmission, fuel_type");
+
+      console.log("🚗 Cars data:", carsData?.length, "cars");
+
+      // Set brands: use brands table, or cars brands, or default
+      if (brandsData && brandsData.length > 0) {
+        const brands = brandsData.map((b) => b.name).sort();
+        console.log("✅ Setting brands from brands table:", brands.length);
+        setAvailableBrands(brands);
+      } else if (carsData && carsData.length > 0) {
+        const carBrands = [
+          ...new Set(carsData.map((car) => car.brand).filter(Boolean)),
+        ];
+        // Merge with default brands
+        const allBrands = [...new Set([...carBrands, ...defaultBrands])].sort();
+        setAvailableBrands(allBrands);
+      } else {
+        setAvailableBrands(defaultBrands);
+      }
+
+      // Set locations: use locations table, or cars locations, or default
+      if (locationsData && locationsData.length > 0) {
+        const locations = locationsData.map((l) => l.city).sort();
+        console.log(
+          "✅ Setting locations from locations table:",
+          locations.length
+        );
+        setAvailableLocations(locations);
+      } else if (carsData && carsData.length > 0) {
+        const carLocations = [
+          ...new Set(carsData.map((car) => car.location).filter(Boolean)),
+        ];
+        // Merge with default locations
+        const allLocations = [
+          ...new Set([...carLocations, ...defaultLocations]),
+        ].sort();
+        console.log("✅ Setting locations merged:", allLocations.length);
+        setAvailableLocations(allLocations);
+      } else {
+        console.log("✅ Setting default locations:", defaultLocations.length);
+        setAvailableLocations(defaultLocations);
+      }
+
+      // Extract unique body types, transmissions, fuel types from cars
+      // Always merge with defaults to show all options
+      const defaultBodyTypes = [
+        "SUV",
+        "Sedan",
+        "Hatchback",
+        "MPV",
+        "Coupe",
+        "Convertible",
+        "Truck",
+        "Van",
+        "Wagon",
+        "Sports Car",
+        "Crossover",
+        "Pickup",
+        "Minivan",
+        "Roadster",
+        "Limousine",
+      ];
+
+      const defaultTransmissions = [
+        "Manual",
+        "Automatic",
+        "CVT",
+        "DCT",
+        "Semi-Automatic",
+        "AMT",
+        "Dual Clutch",
+        "Tiptronic",
+      ];
+
+      const defaultFuelTypes = [
+        "Bensin",
+        "Diesel",
+        "Electric",
+        "Hybrid",
+        "Plug-in Hybrid",
+        "CNG",
+        "LPG",
+        "Flex Fuel",
+        "Hydrogen",
+        "Biodiesel",
+      ];
+
+      if (carsData && carsData.length > 0) {
+        // Merge database values with defaults
+        const carBodyTypes = [
+          ...new Set(carsData.map((car) => car.body_type).filter(Boolean)),
+        ];
+        const allBodyTypes = [
+          ...new Set([...carBodyTypes, ...defaultBodyTypes]),
+        ].sort();
+        console.log("✅ Setting body types:", allBodyTypes.length);
+        setAvailableBodyTypes(allBodyTypes);
+
+        const carTransmissions = [
+          ...new Set(carsData.map((car) => car.transmission).filter(Boolean)),
+        ];
+        const allTransmissions = [
+          ...new Set([...carTransmissions, ...defaultTransmissions]),
+        ].sort();
+        console.log("✅ Setting transmissions:", allTransmissions.length);
+        setAvailableTransmissions(allTransmissions);
+
+        const carFuelTypes = [
+          ...new Set(carsData.map((car) => car.fuel_type).filter(Boolean)),
+        ];
+        const allFuelTypes = [
+          ...new Set([...carFuelTypes, ...defaultFuelTypes]),
+        ].sort();
+        console.log("✅ Setting fuel types:", allFuelTypes.length);
+        setAvailableFuelTypes(allFuelTypes);
+      } else {
+        // Set default values if no cars data
+        setAvailableBodyTypes(defaultBodyTypes.sort());
+        setAvailableTransmissions(defaultTransmissions.sort());
+        setAvailableFuelTypes(defaultFuelTypes.sort());
+      }
+    } catch (error) {
+      console.error("Error fetching filter options:", error);
+      // Set all defaults on error
+      setAvailableBrands(
+        [
+          "Toyota",
+          "Honda",
+          "Daihatsu",
+          "Suzuki",
+          "Mitsubishi",
+          "Nissan",
+          "Mazda",
+          "BMW",
+          "Mercedes-Benz",
+          "Audi",
+          "Volkswagen",
+          "Hyundai",
+          "KIA",
+          "Ford",
+          "Chevrolet",
+          "Wuling",
+          "DFSK",
+          "MG",
+          "Lexus",
+          "Isuzu",
+          "Subaru",
+          "Peugeot",
+          "Renault",
+          "Porsche",
+          "Tesla",
+        ].sort()
+      );
+      setAvailableLocations(
+        [
+          "Jakarta",
+          "Surabaya",
+          "Bandung",
+          "Medan",
+          "Semarang",
+          "Makassar",
+          "Palembang",
+          "Tangerang",
+          "Depok",
+          "Bekasi",
+          "Bogor",
+          "Batam",
+          "Pekanbaru",
+          "Bandar Lampung",
+          "Padang",
+          "Malang",
+          "Denpasar",
+          "Samarinda",
+          "Balikpapan",
+          "Pontianak",
+          "Manado",
+          "Yogyakarta",
+          "Solo",
+          "Cirebon",
+          "Serang",
+        ].sort()
+      );
+      setAvailableBodyTypes(
+        [
+          "SUV",
+          "Sedan",
+          "Hatchback",
+          "MPV",
+          "Coupe",
+          "Convertible",
+          "Truck",
+          "Van",
+          "Wagon",
+          "Sports Car",
+          "Crossover",
+          "Pickup",
+          "Minivan",
+          "Roadster",
+          "Limousine",
+        ].sort()
+      );
+      setAvailableTransmissions(
+        [
+          "Manual",
+          "Automatic",
+          "CVT",
+          "DCT",
+          "Semi-Automatic",
+          "AMT",
+          "Dual Clutch",
+          "Tiptronic",
+        ].sort()
+      );
+      setAvailableFuelTypes(
+        [
+          "Bensin",
+          "Diesel",
+          "Electric",
+          "Hybrid",
+          "Plug-in Hybrid",
+          "CNG",
+          "LPG",
+          "Flex Fuel",
+          "Hydrogen",
+          "Biodiesel",
+        ].sort()
+      );
+    }
+  };
+
   const getBrands = () => {
-    const brands = [...new Set(cars.map((car) => car.brand))];
-    return brands.sort();
+    console.log(
+      "🏷️ getBrands() called, returning:",
+      availableBrands.length,
+      "brands"
+    );
+    return availableBrands;
   };
 
   const getLocations = () => {
-    const locations = [...new Set(cars.map((car) => car.location))];
-    return locations.sort();
+    console.log(
+      "📍 getLocations() called, returning:",
+      availableLocations.length,
+      "locations"
+    );
+    return availableLocations;
   };
 
   const formatPrice = (price: number) => {
-    return `Rp ${(price / 1000000).toFixed(0)} Jt`;
+    return `Rp ${price.toLocaleString("id-ID")}`;
   };
 
   if (loading) {
@@ -206,10 +585,15 @@ export default function CarsScreen() {
         <View style={styles.resultRow}>
           <Text style={styles.resultCount}>
             {filteredCars.length} mobil ditemukan
+            {searchQuery && ` untuk "${searchQuery}"`}
           </Text>
-          {activeFilterCount > 0 && (
-            <TouchableOpacity onPress={resetFilters}>
-              <Text style={styles.clearFilters}>Hapus Filter</Text>
+          {(activeFilterCount > 0 || searchQuery) && (
+            <TouchableOpacity
+              onPress={() => {
+                resetFilters();
+                setSearchQuery("");
+              }}>
+              <Text style={styles.clearFilters}>Reset</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -274,7 +658,7 @@ export default function CarsScreen() {
               <View style={styles.filterSection}>
                 <Text style={styles.filterLabel}>Transmission</Text>
                 <View style={styles.filterRow}>
-                  {["Manual", "Automatic", "CVT", "DCT"].map((type) => (
+                  {availableTransmissions.map((type) => (
                     <TouchableOpacity
                       key={type}
                       style={[
@@ -306,7 +690,7 @@ export default function CarsScreen() {
               <View style={styles.filterSection}>
                 <Text style={styles.filterLabel}>Fuel Type</Text>
                 <View style={styles.filterRow}>
-                  {["Petrol", "Diesel", "Electric", "Hybrid"].map((type) => (
+                  {availableFuelTypes.map((type) => (
                     <TouchableOpacity
                       key={type}
                       style={[
@@ -370,6 +754,36 @@ export default function CarsScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
+              </View>
+
+              {/* Body Type Filter */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterLabel}>Body Type</Text>
+                <View style={styles.filterRow}>
+                  {availableBodyTypes.map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[
+                        styles.filterChip,
+                        filters.bodyType === type && styles.filterChipActive,
+                      ]}
+                      onPress={() =>
+                        setFilters({
+                          ...filters,
+                          bodyType: filters.bodyType === type ? "" : type,
+                        })
+                      }>
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          filters.bodyType === type &&
+                            styles.filterChipTextActive,
+                        ]}>
+                        {type}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
 
               {/* Price Range */}
@@ -510,7 +924,7 @@ export default function CarsScreen() {
                 </View>
 
                 <Text style={styles.price}>
-                  Rp {(item.price / 1000000).toFixed(0)} Jt
+                  Rp {item.price.toLocaleString("id-ID")}
                 </Text>
               </View>
             </TouchableOpacity>

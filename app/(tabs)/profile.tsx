@@ -5,14 +5,45 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  Image,
 } from "react-native";
 import { useRouter, Link } from "expo-router";
 import { useAuthStore } from "@/store/authStore";
 import { Feather } from "@expo/vector-icons";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, signOut } = useAuthStore();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchAvatar();
+    }
+  }, [user]);
+
+  const fetchAvatar = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("avatar_url")
+        .eq("id", user?.id)
+        .single();
+
+      if (error) {
+        console.error("Error fetching avatar:", error);
+        return;
+      }
+
+      if (data?.avatar_url) {
+        setAvatarUrl(data.avatar_url);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -53,7 +84,11 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
-            <Feather name="user" color="#f59e0b" size={48} />
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <Feather name="user" color="#f59e0b" size={48} />
+            )}
           </View>
           <Text style={styles.name}>{user.full_name || "User"}</Text>
           <Text style={styles.email}>{user.email}</Text>
@@ -195,6 +230,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   name: {
     fontSize: 20,
