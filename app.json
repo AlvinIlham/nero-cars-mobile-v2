@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Nero Cars",
-    "slug": "nero-cars-mobile",
-    "version": "1.0.0",
+    "name": "Nero Cars V2",
+    "slug": "nerocars-v2-app",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -11,22 +11,33 @@
       "resizeMode": "contain",
       "backgroundColor": "#0f172a"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nerocars.mobile"
+      "bundleIdentifier": "com.nerocars.mobilev2"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f172a"
       },
-      "package": "com.nerocars.mobile"
+      "package": "com.nerocars.mobilev2"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-router"],
-    "scheme": "nerocars"
+    "plugins": [
+      "expo-router"
+    ],
+    "scheme": "nerocars",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "31aa7800-8a13-461e-a481-aa6126098c39"
+      }
+    },
+    "owner": "udinsamsudin1928"
   }
 }
