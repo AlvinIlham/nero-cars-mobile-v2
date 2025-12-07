@@ -5,6 +5,7 @@ Repository ini adalah versi baru yang terpisah dari repository lama.
 ## Setup GitHub Repository
 
 ### 1. Buat Repository Baru di GitHub
+
 - Buka https://github.com/new
 - Nama repository: `nero-cars-mobile-v2`
 - Deskripsi: "Nero Cars - Platform Jual Beli Mobil (Mobile App Version 2)"
@@ -69,11 +70,13 @@ Scan QR code dengan Expo Go app di smartphone Anda.
 ## Menjalankan di Perangkat
 
 ### Android
+
 ```powershell
 npx expo run:android
 ```
 
 ### iOS (Mac only)
+
 ```powershell
 npx expo run:ios
 ```
