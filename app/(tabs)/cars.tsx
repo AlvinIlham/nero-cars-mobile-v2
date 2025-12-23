@@ -62,9 +62,31 @@ export default function CarsScreen() {
     console.log("🚗 Cars screen mounted - fetching data...");
     fetchCars();
     fetchFilterOptions();
+
+    // Subscribe to realtime changes on cars table
+    const carsChannel = supabase
+      .channel("cars-screen-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "cars",
+        },
+        (payload) => {
+          console.log("🔄 Cars realtime update:", payload.eventType);
+          // Refresh cars data when changes occur
+          fetchCars();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(carsChannel);
+    };
   }, []);
 
-  // Load search query and filters from URL params
+  // Load search query and filters from URL params - only on mount
   useEffect(() => {
     if (params.search && typeof params.search === "string") {
       setSearchQuery(params.search);
@@ -101,7 +123,8 @@ export default function CarsScreen() {
     ) {
       setFilters(urlFilters);
     }
-  }, [params]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount to load initial params
 
   // Helper function to parse images - handle string, JSON string, or array
   const parseImages = (images: any): string[] => {
@@ -564,9 +587,13 @@ export default function CarsScreen() {
               placeholderTextColor="#64748b"
               value={searchQuery}
               onChangeText={setSearchQuery}
+              editable={true}
+              selectTextOnFocus={true}
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <TouchableOpacity
+                onPress={() => setSearchQuery("")}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Feather name="x" color="#94a3b8" size={20} />
               </TouchableOpacity>
             )}

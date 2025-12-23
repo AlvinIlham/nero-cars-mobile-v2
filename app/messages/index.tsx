@@ -63,13 +63,31 @@ export default function MessagesScreen() {
       loadConversations();
       subscribeToPresence();
 
-      // Subscribe to realtime updates
-      const channel = subscribeToUserConversations(user.id, () => {
+      // Subscribe to realtime updates for conversations
+      const conversationChannel = subscribeToUserConversations(user.id, () => {
         loadConversations();
       });
 
+      // Subscribe to messages changes (for unread count updates)
+      const messagesChannel = supabase
+        .channel(`user-messages:${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "messages",
+          },
+          () => {
+            // Reload conversations to update unread counts
+            loadConversations();
+          }
+        )
+        .subscribe();
+
       return () => {
-        supabase.removeChannel(channel);
+        supabase.removeChannel(conversationChannel);
+        supabase.removeChannel(messagesChannel);
       };
     }
   }, [user]);

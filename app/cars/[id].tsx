@@ -9,8 +9,10 @@ import {
   ActivityIndicator,
   Dimensions,
   Alert,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCarStore } from "@/store/carStore";
 import { useAuthStore } from "@/store/authStore";
 import { Feather, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
@@ -24,6 +26,7 @@ export default function CarDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuthStore();
+  const insets = useSafeAreaInsets();
   const fetchCarById = useCarStore((state) => state.fetchCarById);
   const [car, setCar] = useState<Car | null>(null);
   const [loading, setLoading] = useState(true);
@@ -179,7 +182,11 @@ export default function CarDetailScreen() {
   const carImages = getCarImages();
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{
+        paddingBottom: Math.max(insets.bottom, 20) + 80, // Add extra padding for button
+      }}>
       <View style={styles.imageContainer}>
         <Image
           source={{
@@ -283,17 +290,20 @@ export default function CarDetailScreen() {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.contactButton}
-          onPress={handleContactSeller}>
-          <Ionicons
-            name="chatbubble-ellipses"
-            size={20}
-            color="#fff"
-            style={{ marginRight: 8 }}
-          />
-          <Text style={styles.contactButtonText}>Hubungi Penjual</Text>
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.contactButton}
+            onPress={handleContactSeller}
+            activeOpacity={0.8}>
+            <Ionicons
+              name="chatbubble-ellipses"
+              size={20}
+              color="#fff"
+              style={{ marginRight: 8 }}
+            />
+            <Text style={styles.contactButtonText}>Hubungi Penjual</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
@@ -422,18 +432,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+  buttonContainer: {
+    marginTop: 24,
+    marginBottom: 16,
+  },
   contactButton: {
     flexDirection: "row",
     backgroundColor: "#f59e0b",
-    padding: 16,
-    borderRadius: 8,
+    padding: 18,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
+    shadowColor: "#f59e0b",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   contactButtonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "bold",
+    letterSpacing: 0.5,
   },
 });

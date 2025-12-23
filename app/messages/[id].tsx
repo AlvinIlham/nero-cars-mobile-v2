@@ -18,6 +18,7 @@ import {
   Dimensions,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -36,6 +37,7 @@ import {
 export default function ChatRoomScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const conversationId = params.id as string;
   const otherPersonName = params.otherPersonName as string;
   const carInfo = params.carInfo as string;
@@ -582,29 +584,78 @@ export default function ChatRoomScreen() {
 
   const handleDownloadFile = async (fileUrl: string, fileName: string) => {
     try {
-      Alert.alert("Downloading", "Sedang mengunduh file...");
+      // Tanyakan user mau buka atau bagikan file
+      Alert.alert(
+        "File",
+        "Pilih aksi untuk file ini:",
+        [
+          {
+            text: "Buka File",
+            onPress: async () => {
+              try {
+                // Langsung buka URL file dari storage
+                // Browser atau viewer akan otomatis terbuka
+                const canOpen = await Linking.canOpenURL(fileUrl);
+                if (canOpen) {
+                  await Linking.openURL(fileUrl);
+                } else {
+                  Alert.alert(
+                    "Info",
+                    "Tidak dapat membuka file. Coba gunakan opsi Bagikan."
+                  );
+                }
+              } catch (error) {
+                console.error("Error opening file:", error);
+                Alert.alert("Error", "Gagal membuka file. Silakan coba lagi.");
+              }
+            },
+          },
+          {
+            text: "Unduh & Bagikan",
+            onPress: async () => {
+              try {
+                // Download file to cache directory
+                const destination = new FileSystem.File(
+                  FileSystem.Paths.cache,
+                  fileName
+                );
+                const downloadedFile = await FileSystem.File.downloadFileAsync(
+                  fileUrl,
+                  destination,
+                  { idempotent: true }
+                );
 
-      // Download file to cache directory
-      const destination = new FileSystem.File(FileSystem.Paths.cache, fileName);
-      const downloadedFile = await FileSystem.File.downloadFileAsync(
-        fileUrl,
-        destination,
-        { idempotent: true }
+                // Share/save the downloaded file
+                if (await Sharing.isAvailableAsync()) {
+                  await Sharing.shareAsync(downloadedFile.uri, {
+                    UTI: "public.item",
+                    mimeType: "*/*",
+                  });
+                } else {
+                  Alert.alert(
+                    "Sukses",
+                    `File disimpan di: ${downloadedFile.uri}`
+                  );
+                }
+              } catch (error) {
+                console.error("Error sharing file:", error);
+                Alert.alert(
+                  "Error",
+                  "Gagal membagikan file. Silakan coba lagi."
+                );
+              }
+            },
+          },
+          {
+            text: "Batal",
+            style: "cancel",
+          },
+        ],
+        { cancelable: true }
       );
-
-      // Share/save the downloaded file
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(downloadedFile.uri, {
-          UTI: "public.item",
-          mimeType: "*/*",
-        });
-        Alert.alert("Sukses", "File berhasil diunduh!");
-      } else {
-        Alert.alert("Sukses", `File disimpan di: ${downloadedFile.uri}`);
-      }
     } catch (error) {
-      console.error("Error downloading file:", error);
-      Alert.alert("Error", "Gagal mengunduh file. Silakan coba lagi.");
+      console.error("Error handling file:", error);
+      Alert.alert("Error", "Gagal memproses file. Silakan coba lagi.");
     }
   };
 
@@ -850,7 +901,7 @@ export default function ChatRoomScreen() {
             </Text>
             <View style={styles.fileFooter}>
               <Ionicons
-                name="download-outline"
+                name="open-outline"
                 size={12}
                 color={isSent ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.6)"}
               />
@@ -859,7 +910,7 @@ export default function ChatRoomScreen() {
                   styles.fileAction,
                   isSent ? styles.sentText : styles.receivedText,
                 ]}>
-                Tap to download
+                Ketuk untuk membuka
               </Text>
             </View>
           </View>
@@ -1035,7 +1086,7 @@ export default function ChatRoomScreen() {
       <KeyboardAvoidingView
         style={styles.chatContainer}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={90}>
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}>
         {isBlocked && (
           <View style={styles.blockedBanner}>
             <Ionicons name="ban" size={16} color="#ef4444" />
@@ -1059,7 +1110,13 @@ export default function ChatRoomScreen() {
         />
 
         {/* Input Area */}
-        <View style={styles.inputContainer}>
+        <View
+          style={[
+            styles.inputContainer,
+            {
+              paddingBottom: Math.max(insets.bottom, 8),
+            },
+          ]}>
           <TouchableOpacity
             style={styles.attachButton}
             onPress={handlePickDocument}
@@ -1341,24 +1398,29 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingTop: 12,
+    paddingBottom: 12,
     backgroundColor: "#1e293b",
     borderTopWidth: 1,
     borderTopColor: "#334155",
+    minHeight: 68,
   },
   attachButton: {
-    padding: 8,
+    padding: 10,
     marginRight: 4,
+    borderRadius: 20,
+    backgroundColor: "#334155",
   },
   textInput: {
     flex: 1,
     backgroundColor: "#334155",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     fontSize: 15,
     color: "#ffffff",
-    maxHeight: 100,
+    maxHeight: 120,
+    minHeight: 44,
   },
   messageImage: {
     width: 200,
@@ -1415,16 +1477,26 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
   sendButton: {
-    backgroundColor: "#3b82f6",
+    backgroundColor: "#f59e0b",
     borderRadius: 24,
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 8,
+    shadowColor: "#f59e0b",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   sendButtonDisabled: {
     backgroundColor: "#334155",
+    shadowOpacity: 0,
+    elevation: 0,
   },
   modalOverlay: {
     flex: 1,

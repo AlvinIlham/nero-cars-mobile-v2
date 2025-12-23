@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   Modal,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useAuthStore } from "@/store/authStore";
 import { useCarStore } from "@/store/carStore";
 import { Feather, Ionicons } from "@expo/vector-icons";
@@ -57,6 +57,8 @@ export default function HomeScreen() {
     maxYear: 0,
   });
   const [activeFilterCount, setActiveFilterCount] = useState(0);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   // State untuk filter options dari database
   const [availableBrands, setAvailableBrands] = useState<string[]>([]);
@@ -71,8 +73,104 @@ export default function HomeScreen() {
     fetchFilterOptions();
     if (user?.id) {
       fetchFavorites();
+      fetchUnreadNotifications();
+      fetchUnreadMessages();
     }
+
+    // Subscribe to realtime changes on cars table
+    const carsChannel = supabase
+      .channel("home-cars-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "cars",
+        },
+        (payload) => {
+          console.log("🔄 Cars realtime update:", payload.eventType);
+          // Refresh cars data when changes occur
+          fetchCars();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to realtime changes on notifications table
+    const notificationsChannel = user?.id
+      ? supabase
+          .channel(`home-notifications-${user.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "notifications",
+              filter: `user_id=eq.${user.id}`,
+            },
+            (payload) => {
+              console.log(
+                "🔔 Notification realtime update:",
+                payload.eventType,
+                payload
+              );
+              // Refresh unread count when notifications change
+              fetchUnreadNotifications();
+            }
+          )
+          .subscribe((status) => {
+            console.log("🔔 Notifications subscription status:", status);
+          })
+      : null;
+
+    // Subscribe to realtime changes on messages table
+    const messagesChannel = user?.id
+      ? supabase
+          .channel(`home-messages-${user.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "messages",
+            },
+            (payload) => {
+              console.log(
+                "💬 Message realtime update:",
+                payload.eventType,
+                payload
+              );
+              // Refresh unread count when messages change
+              fetchUnreadMessages();
+            }
+          )
+          .subscribe((status) => {
+            console.log("💬 Messages subscription status:", status);
+          })
+      : null;
+
+    return () => {
+      supabase.removeChannel(carsChannel);
+      if (notificationsChannel) {
+        supabase.removeChannel(notificationsChannel);
+      }
+      if (messagesChannel) {
+        supabase.removeChannel(messagesChannel);
+      }
+    };
   }, [user]);
+
+  // Refresh unread notifications when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id) {
+        console.log(
+          "🔄 Screen focused - refreshing notifications and messages"
+        );
+        fetchUnreadNotifications();
+        fetchUnreadMessages();
+      }
+    }, [user])
+  );
 
   const resetFilters = () => {
     setFilters({
@@ -108,6 +206,79 @@ export default function HomeScreen() {
     }
   };
 
+  const fetchUnreadNotifications = async () => {
+    try {
+      if (!user?.id) {
+        console.log("⚠️ No user ID, skipping notification fetch");
+        return;
+      }
+
+      console.log("🔔 Fetching unread notifications for user:", user.id);
+
+      const { count, error } = await supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("is_read", false);
+
+      if (error) {
+        console.log("❌ Error fetching unread notifications:", error.message);
+        return;
+      }
+
+      console.log("✅ Unread notifications count:", count);
+      setUnreadNotifCount(count || 0);
+    } catch (error) {
+      console.log("❌ Error in fetchUnreadNotifications:", error);
+    }
+  };
+
+  const fetchUnreadMessages = async () => {
+    try {
+      if (!user?.id) {
+        console.log("⚠️ No user ID, skipping messages fetch");
+        return;
+      }
+
+      console.log("💬 Fetching unread messages for user:", user.id);
+
+      // Get conversation IDs in single query
+      const { data: conversations, error: convError } = await supabase
+        .from("conversations")
+        .select("id")
+        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`);
+
+      if (convError) {
+        console.log("❌ Error fetching conversations:", convError.message);
+        return;
+      }
+
+      if (!conversations || conversations.length === 0) {
+        console.log("✅ No conversations found");
+        setUnreadMessagesCount(0);
+        return;
+      }
+
+      // Count all unread messages in ONE query using .in()
+      const conversationIds = conversations.map((c) => c.id);
+      const { count, error } = await supabase
+        .from("messages")
+        .select("*", { count: "exact", head: true })
+        .in("conversation_id", conversationIds)
+        .eq("is_read", false)
+        .neq("sender_id", user.id);
+
+      if (error) {
+        console.log("❌ Error counting unread messages:", error.message);
+        return;
+      }
+
+      console.log("✅ Unread messages count:", count || 0);
+      setUnreadMessagesCount(count || 0);
+    } catch (error) {
+      console.log("❌ Error in fetchUnreadMessages:", error);
+    }
+  };
   const fetchFilterOptions = async () => {
     try {
       const defaultBrands = [
@@ -840,11 +1011,25 @@ export default function HomeScreen() {
                 style={styles.quickActionButton}
                 onPress={() => router.push("/notifications")}>
                 <Ionicons name="notifications-outline" size={24} color="#fff" />
+                {unreadNotifCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {unreadNotifCount > 99 ? "99+" : unreadNotifCount}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.quickActionButton}
                 onPress={() => router.push("/messages")}>
                 <Ionicons name="chatbubble-outline" size={24} color="#fff" />
+                {unreadMessagesCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
           )}
@@ -1133,6 +1318,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#f59e0b",
+    position: "relative",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#ef4444",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: "#0f172a",
+  },
+  notificationBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "bold",
   },
   heroTitle: {
     fontSize: 36,

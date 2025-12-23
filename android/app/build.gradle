@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.nerocars.mobilev2'
+    namespace 'com.nerocars.app'
     defaultConfig {
-        applicationId 'com.nerocars.mobilev2'
+        applicationId 'com.nerocars.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

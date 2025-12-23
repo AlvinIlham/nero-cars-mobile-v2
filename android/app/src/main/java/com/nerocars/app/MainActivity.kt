@@ -1,4 +1,4 @@
-package com.nerocars.mobilev2
+package com.nerocars.app
 
 import android.os.Build
 import android.os.Bundle

@@ -86,6 +86,12 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity
+            onPress={() => router.push("/auth/forgot-password")}
+            style={styles.forgotPassword}>
+            <Text style={styles.forgotPasswordText}>Lupa Password?</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={loading}>
@@ -163,6 +169,16 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  forgotPassword: {
+    alignItems: "flex-end",
+    marginTop: -8,
+    marginBottom: 8,
+  },
+  forgotPasswordText: {
+    color: "#f59e0b",
+    fontSize: 14,
+    fontWeight: "600",
   },
   footer: {
     flexDirection: "row",

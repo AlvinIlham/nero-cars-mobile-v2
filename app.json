@@ -1,27 +1,27 @@
 {
   "expo": {
-    "name": "Nero Cars V2",
+    "name": "Nero Cars",
     "slug": "nerocars-v2-app",
     "version": "2.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/logo.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/images/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0f172a"
+      "backgroundColor": "#1a1a1a"
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nerocars.mobilev2"
+      "bundleIdentifier": "com.nerocars.app"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0f172a"
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#1a1a1a"
       },
-      "package": "com.nerocars.mobilev2"
+      "package": "com.nerocars.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,12 +30,11 @@
     "scheme": "nerocars",
     "extra": {
       "router": {},
-      "eas": {
-        "projectId": "31aa7800-8a13-461e-a481-aa6126098c39"
-      },
       "supabaseUrl": "https://fnpdxvfzwnirhazitmoc.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZucGR4dmZ6d25pcmhheml0bW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MzU3ODEsImV4cCI6MjA3OTAxMTc4MX0.PlCs1taoRaFzcXxIQQgCu2qOTEv4NK0LJmH_q7F3hIU"
-    },
-    "owner": "udinsamsudin1928"
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZucGR4dmZ6d25pcmhheml0bW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0MzU3ODEsImV4cCI6MjA3OTAxMTc4MX0.PlCs1taoRaFzcXxIQQgCu2qOTEv4NK0LJmH_q7F3hIU",
+      "eas": {
+        "projectId": "a5063882-25ab-48b4-a47b-3f1b33347b16"
+      }
+    }
   }
 }
